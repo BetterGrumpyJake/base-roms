@@ -4559,6 +4559,10 @@ PRG008_B536:
 	BNE PRG008_B53B	 ; If Y <> 0, jump to PRG008_B53B
 
 	STA <Player_XVel ; Otherwise, halt Player horizontally
+	
+	JMP Player_DetectSolids		;marios X just corrected/nudged out of wall, but the data from detection
+								;at PRG008_B4CA is stale now, rerun to get new values after the nudge
+								;to correctly use with the floor check
 
 PRG008_B53B:
 	LDA <Player_YVel
