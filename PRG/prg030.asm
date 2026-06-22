@@ -2844,7 +2844,7 @@ PRG030_910C:
 
 	; Player returns to map dead
 
-	LDY #$02	 ; Y = 2 (Will be the Map_Operation value)
+	LDY #$0D	 ; Y = 2 (Will be the Map_Operation value)
 
 	; Map_ReturnStatus = 0
 	LDA #$00
