@@ -2496,7 +2496,7 @@ PRG030_8F31:
 	LDX Player_Current	 ; X = Player_Current
 
 	; Transfer Player's current power up to the World Map counterpart
-	LDA <Player_Suit
+	LDA #00
 	STA World_Map_Power,X
 
 	; Level_GetWandState = 0
