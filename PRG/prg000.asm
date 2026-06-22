@@ -3155,12 +3155,12 @@ PRG000_CFA8:
 
 
 	; Unused space... deleted code?
-	NOP
-	NOP
-	NOP
-	NOP
-	NOP
-	NOP
+	;NOP
+	;NOP
+	;NOP
+	;NOP
+	;NOP
+	;NOP
 	NOP
 	NOP
 
@@ -3369,6 +3369,8 @@ Object_Gravity:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; $D097
 Object_Move:
+	JSR Buster_ThrowCheck_30 ;if buster threw object, hijack his velocities until it hits ground
+	
 	LDA <Objects_XVel,X	; Get Object's X velocity
 	PHA		 	; Save it
 
@@ -4374,7 +4376,8 @@ Level_PrepareNewObject:
 	STA Objects_FlipBits,X
 	STA Objects_Frame,X	
 	STA Objects_ColorCycle,X
-	STA <Objects_DetStat,X	
+	STA <Objects_DetStat,X
+	STA Buster_ThrowFlag,X ;clear the flag that says whether something got thrown by buster
 
 	CPX #$06
 	BGE PRG000_D4C8	 ; If using slot index >= 6, jump to PRG000_D4C8 (skip variables available only to slots 0 to 5)

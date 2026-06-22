@@ -927,68 +927,49 @@ PRG002_A4C5:
 
 Buster_XVel:	.byte -$10, $10
 
-ObjInit_BusterBeatle:
-	LDY <Scroll_LastDir	; Get last scroll direction
+Buster_BlockLiftXOff:
+	.byte $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $02, $03, $02, $01, $00
+	.byte $01, $03, $05, $07, $08, $09, $0A, $0A
 
-	; Set flip bits to face Player
-	LDA FacePlayer_FlipBitsStart,Y
+Buster_BlockLiftYOff:
+	.byte -$0E, -$0E, -$0E, -$0E, -$0E, -$0E, -$0E, -$0E, -$0E, -$0E, -$0E, -$0D
+	.byte -$0C, -$0D, -$0E, -$0E, -$0F, -$0E, -$0D, -$0B, -$09, -$06, -$03, $00
+
+	BusterTileTable:						;what tiles (need to be solid) can buster pick up
+	.byte TILEA_ICEBRICK				;$32
+	;.byte TILEA_BRICK					;$67
+	;.byte TILE1_PIPETB1_L				;AD Pipe top/bottom 1 left (alt level)
+	;.byte TILE1_PIPETB1_R				;AE Pipe top/bottom 1 right
+
+;size of table, regardless if added to/subtracted from
+BusterTileTableSize = * - BusterTileTable
+
+BusterObjectTable:						;what objects can buster pickup
+	.byte OBJ_GREENTROOPA				;$6C green koopa troopa
+	.byte OBJ_REDTROOPA					;$6D red koopa troopa
+	.byte OBJ_BULLETBILL				;$78 Regular Bullet bill
+	.byte OBJ_BUSTERBEATLE
+
+;size of table, regardless if added to/subtracted from
+BusterObjectTableSize = * - BusterObjectTable
+
+ObjInit_BusterBeatle:
+	LDY <Scroll_LastDir					;Get last scroll direction
+
+	LDA FacePlayer_FlipBitsStart,Y		;Set flip bits to face Player
 	STA Objects_FlipBits,X
 
-	; Set appropriate X velocity for Buster Beatle
-	LDA Buster_XVel,Y
+	LDA Buster_XVel,Y					;Set appropriate X velocity for Buster Beatle
 	STA <Objects_XVel,X
 
-	RTS		 ; Return
+	RTS
 
-
-ObjNorm_BusterBeatle:
-	JSR Object_Move	 ; Do standard object movements
-	JSR Object_HandleBumpUnderneath	 ; Get killed if hit underneath by block
-	JSR Object_HitFloorAlign	 ; If Buster hits floor, align him
-
-	LDA <Objects_DetStat,X
-	AND #$03
-	BEQ PRG002_A535	 ; If not hit wall, jump to PRG002_A535
-
-	LDA <Objects_DetStat,X
-	AND #$04
-	BEQ PRG002_A532	 ; If Buster has not hit floor, jump to PRG002_A532
-
-	LDA <Objects_SpriteX,X
-	CMP #$04
-	BLT PRG002_A532	 ; If Buster is near left edge of screen, jump to PRG002_A532
-
-	CMP #232
-	BCS PRG002_A532	 ; If Buster is near right edge of screen, jump to PRG002_A532
-
-	JSR Object_AnySprOffscreen
-	BNE PRG002_A532	 ; If any of Buster's sprite are off-screen, jump to PRG002_A532
-
-	LDY #$01	; Y = 1 (Buster's got brick!)
-
-	LDA Object_TileWall2
-
-	CMP #TILEA_ICEBRICK
-	BEQ PRG002_A508	 ; If Buster's touching an ice brick, jump to PRG002_A508
-
-	; ?? This might be lost functionality?
-	; Tile $F4 is Jelectro in most sets... Buster will pick up and toss this
-	; tile like an Ice Brick, but it's ... never an Ice Brick.  
-	; Maybe he'd toss Jelectros at you??
-	CMP #$f4
-	BNE PRG002_A532
-
-	INY		 ; Y = 2
-
-PRG002_A508:
-	STY <Objects_Var5,X	 ; Update Var5
-
-	; Change tile event (to background) by ice brick
-	LDA #CHNGTILE_DELETETOBG
+;Buster Tile Deletion
+Buster_TilePickup:						;found tile to pick up
+	LDA #CHNGTILE_DELETETOBG			;Change tile event (to background) by ice brick
 	STA Level_ChgTileEvent
 
-	; Set all of the block change coordinates to remove the ice brick
-	LDA ObjTile_DetYHi
+	LDA ObjTile_DetYHi					;Set all of the block change coordinates to remove the ice brick
 	STA Level_BlockChgYHi
 
 	LDA ObjTile_DetYLo
@@ -1001,267 +982,418 @@ PRG002_A508:
 	LDA ObjTile_DetXLo
 	AND #$f0
 	STA Level_BlockChgXLo
+	
+	LDA #$01							;store 1 to busters Objects_Var5 to specify ice brick
+	BNE Buster_SetVar					;bit 7 clear for ice brick, branch to Buster_SetVar(always)
 
-	; Set Buster's timer 2 to $0F
-	LDA #$0f
+;Buster what is being held check
+Buster_CheckHeldState:
+	LDY Objects_Var3,X					;Y=busters held object slot id
+	LDA Objects_State,Y					;A=held objects state
+	LSR A								;check if it's normal(02)/shelled(03)
+										;shifted right only 2 and 3 become 1
+										;2=00000010 ->shifted-> 00000001=1 (carry=0)
+										;3=00000011 ->shifted-> 00000001=1 (carry=1)
+	CMP #$01
+	BEQ PRG002_A535						;branch if it is
+	
+	LDA #$00							;otherwise clear the flags because it's dead/kicked probably
+	STA <Objects_Var5,X					;clear holding flag
+	RTS
+	
+ObjNorm_BusterBeatle:
+	JSR Object_Move	 					;Do standard object movements
+	JSR Object_HandleBumpUnderneath	 	;Get killed if hit underneath by block
+	JSR Object_HitFloorAlign	 		;If Buster hits floor, align him
+
+;Buster holding, floor, object collision checks	
+	LDA <Objects_Var5,X					;buster holding something check
+	BMI Buster_CheckHeldState			;if bit 7 set(object), make sure that object is still in a good state
+	BNE PRG002_A535						;if holding anything don't do pickup logic
+	
+	LDA <Objects_DetStat,X
+	AND #$04							;floor check
+	BEQ Buster_SkipCollision	 		;If Buster has not hit floor, skip collision check
+
+	JSR ObjectToObject_HitTest			;object collision check
+	BCC Buster_SkipCollision			;carry clear=no collision, skip object check
+	
+;Buster Object Check
+Buster_StoreObject:
+	;Y=collided with objects ID slot
+	;A=collided with object id
+	;X=Buster	
+	PHA									;do all this because you cant STY to var3 because its not zp
+	TYA
+	STA Objects_Var3,X					;store collided with objects slot to busters Var3
+	PLA
+
+	LDY #BusterObjectTableSize			;set Y to buster object table size
+	
+Buster_ObjectLoop:
+	CMP BusterObjectTable-1,Y			;compare collided with object id to our pickup table
+										;same as for tiles
+	BEQ Buster_ObjectPickup				;pick it up if we found a match
+
+	DEY
+
+	BNE Buster_ObjectLoop
+	
+Buster_SkipCollision:
+;Buster Wall checks
+	LDA <Objects_DetStat,X
+	AND #$03							;wall check
+	BEQ PRG002_A535	 					;If not hit wall, jump to PRG002_A535
+
+	LDA <Objects_SpriteX,X				;hit a wall, but buster at screen edge. turn him around
+	SUB #$04							;A=busters x pixel (0-255) - 4
+	CMP #232-4							;CMP A to 228
+										;A=4-231 fallthrough
+										;A>=228 = set
+										;A<228 = clear
+	BCS Buster_TurnAround				;if buster is at the edge of screen, jump to Buster_TurnAround
+	
+										;does the quick check for screen edges, before the more extensive check
+
+	JSR Object_AnySprOffscreen			;hit a wall, but buster off screen but still loaded. turn him around
+	BNE Buster_TurnAround	 			;If any of Buster's sprite are off-screen, jump to Buster_TurnAround
+
+	;LDY #$01							;old code, moved to tilepickup
+
+;Buster Tile Check
+	LDA Object_TileWall2				;A = tile buster ran into
+	LDY #BusterTileTableSize			;Y = size of BusterPickupTable
+
+Buster_TileLoop:
+	CMP BusterTileTable-1,Y				;compare A (wall tile) to our pickup table
+										;(pickup table address) -1 + Y(2) = BusterTileTable(1)
+										;(pickup table address) -1 + Y(1) = BusterTileTable(0)
+										;etc
+										;downstream logic needs Y!=0 to draw,throw
+
+	BEQ Buster_TilePickup				;if buster found something, go to Buster_TilePickup
+	
+	DEY									;decrement Y, Y=0 set z flag, Y!=0 do not set z
+
+	BNE Buster_TileLoop					;if z flag not set loop with new Y value
+	BEQ Buster_TurnAround				;if z flag set then Y=0 and we found nothing to pickup
+										;aboutface because it already detected a wall
+
+;Buster Object Pickup
+Buster_ObjectPickup:					;found object to pick up
+	LDY Objects_Var3,X					;Y=object slot we are picking up
+
+	LDA Objects_State,Y					;collided with object state
+	CMP #OBJSTATE_KICKED				;check if kicked
+	
+	;BEQ PRG002_A535					;for kicked shells kill buster, uncomment this, comment out next 4 lines
+	
+	BNE Buster_SkipShelling				;if not kicked, go to Buster_SkipShelling
+	
+	LDA #OBJSTATE_SHELLED				;otherwise set to shelled
+	STA Objects_State,Y
+Buster_SkipShelling:
+	LDA #$80							;store 80 to busters Objects_Var5
+
+;Buster holding something
+Buster_SetVar:
+	STA <Objects_Var5,X	 				;store A to Var5, whatever was set by tilepickup or objectpickup
+
+	LDA #$0f							;set timer for lift animation (15 frames)
 	STA Objects_Timer2,X
+	
+	BNE PRG002_A535						;skip Buster_TurnAround
+	
+Buster_TurnAround:
+	JSR Object_AboutFace	 			;Buster turns around
 
-	BNE PRG002_A535	 ; Jump (technically always) to PRG002_A535
-
-PRG002_A532:
-	JSR Object_AboutFace	 ; Buster turns around
-
+;Buster Normal stuff
 PRG002_A535:
 	LDA Objects_Timer,X
-	BNE PRG002_A542	 ; If timer not expired, jump to PRG002_A542
+	BNE PRG002_A542	 					;If timer not expired, jump to PRG002_A542
 
-	LDA Objects_Timer2,X 
-	BEQ PRG002_A542	 ; If timer 2 expired, jump to PRG002_A542
+	LDA Objects_Timer2,X
+	BEQ PRG002_A542	 					;If timer 2 expired, jump to PRG002_A542
 
-	; Timer 2 not expired...
-	ADD #29	 ; Add to timer 2 value
+	ADD #29								;Timer 2 not expired...
+										;Add to timer2 value
 
 PRG002_A542:
 	LSR A		 
-	STA <Objects_Var4,X	 ; Var4 = timer2 / 2
+	STA <Objects_Var4,X					; Var4 = timer2 / 2
 
-	JSR Object_DeleteOffScreen	 ; Delete object if it falls off-screen
+	JSR Object_DeleteOffScreen	 		;Delete object if it falls off-screen
 
-	JSR Buster_DrawHoldingIceBrick	 ; Draw Buster with his ice brick if he has it
+	JSR Buster_DrawHoldingIceBrick	 	;Draw Buster with his ice brick if he has it
 
-	LDA <Objects_Var5,X
+	LDA <Objects_Var5,X					;If Buster is holding, or his timer is not expired, jump to PRG002_A568
 	ORA Objects_Timer,X
-	BNE PRG002_A568	 	; If Buster is holding a brick or his timer is not expired, jump to PRG002_A568
+	BNE PRG002_A568
 
-	LDY #$10	 ; Y = $10 (Run right)
+	LDY #$10	 						;Y = $10 (Run right)
 
 	LDA Objects_FlipBits,X
 	ASL A
-	BMI PRG002_A55C	 ; If horizontally flipped, jump to PRG002_A55C
+	BMI PRG002_A55C	 					;If horizontally flipped, jump to PRG002_A55C
 
-	LDY #-$10	 ; Y = -$10 (Run left)
+	LDY #-$10	 						;Y = -$10 (Run left)
 
 PRG002_A55C:
-	STY <Objects_XVel,X	 ; Set Buster's X Velocity
+	STY <Objects_XVel,X	 				;Set Buster's X Velocity
 
-	; Buster's little frame toggle
-	LDA <Counter_1
+	LDA <Counter_1						;Buster's little frame toggle
 	LSR A	
 	LSR A	
 	AND #$01
 	STA Objects_Frame,X
 
-	RTS		 ; Return
+	RTS
 
 PRG002_A568:
+; Buster with brick or timer not expired
 
-	; Buster with brick or timer not expired
-
-	; Halt Buster's horizontal movement
-	LDA #$00
+	LDA #$00							;Halt Buster's horizontal movement
 	STA <Objects_XVel,X
 
 	LDA Objects_Timer2,X
-	BEQ PRG002_A57B	 ; If Timer 2 expired, jump to PRG002_A57B
+	BEQ PRG002_A57B	 					;If Timer 2 expired, jump to PRG002_A57B
 
-	; Timer 2 not expired...
-
+; Timer 2 not expired...
 	AND #%00011000
-	BNE PRG002_A5A1	 ; Timing jump to PRG002_A5A1 (RTS)
+	BNE PRG002_A5A1	 					;Timing jump to PRG002_A5A1 (RTS)
  
-	; Buster's frame = 2 
-	LDA #$02
+	LDA #$02							;set Buster's frame = 2 
 	STA Objects_Frame,X
 
-	RTS		 ; Return
+	RTS
 
 PRG002_A57B:
 	LDA Objects_Timer,X
-	BEQ PRG002_A587	 ; If timer expired, jump to PRG002_A587
+	BEQ PRG002_A587	 					;If timer expired, jump to PRG002_A587
 
 	CMP #$11
-	BNE PRG002_A5A1	 ; If timer <> $11, jump to PRG002_A5A1 (RTS)
-	JMP PRG002_A5A2	 ; Otherwise, jump to PRG002_A5A2
+	BEQ Buster_Throw					;if timer=$11, jump to Buster_Throw
+	RTS									;otherwise RTS
 
 PRG002_A587:
-	LDA <Counter_1
+	LDA <Counter_1						;global counter
 	AND #$07
-	BNE PRG002_A5A1	 ; 1:8 ticks continue, otherwise jump to PRG002_A5A1 (RTS)
+	BNE PRG002_A5A1	 					;1:8 ticks continue, otherwise jump to PRG002_A5A1 (RTS)
 
-	; Set Buster's flip to face towards Player
-	JSR Object_CalcCoarseXDiff
+	JSR Object_CalcCoarseXDiff			;Set Buster's flip to face towards Player
 	STA Objects_FlipBits,X
 
 	JSR Object_CalcCoarseYDiff
 	LDA <Temp_Var15
-	CMP #$0c
-	BGE PRG002_A5A1	 ; If Player is too far away, jump to PRG002_A5A1 (RTS)
+	CMP #$0A							;change busters proximity so he doesn't throw when you boop a koopa into shelled
+										;$01 - 4px above - 0.25 tiles
+										;$02 - 8px above - 0.50 tiles
+										;$03 - 12px above - 0.75 tiles
+										;$04 - 16px above - 1.00 tiles
+										;$05 - 20px above - 1.25 tiles
+										;$06 - 24px above - 1.50 tiles
+										;$07 - 28px above - 1.75 tiles
+										;$08 - 32px above - 2.00 tiles
+										;$09 - 36px above - 2.25 tiles
+										;$0A - 40px above - 2.50 tiles
+										;$0B - 44px above - 2.75 tiles
+										;$0C - 48px above - 3.00 tiles (original)
 
-	; "Stay close for $1B and I'll getcha..."
-	LDA #$1b
+	BGE PRG002_A5A1	 					;If Player is too far away, (RTS)
+
+	LDA #$1b							;"Stay close for $1B and I'll getcha..."
 	STA Objects_Timer,X
 
 PRG002_A5A1:
-	RTS		 ; Return
+	RTS
 
-PRG002_A5A2:
-	LDX #$04	 ; X = 4
+;Buster Throw
+Buster_ThrowObject:
+	LDX Objects_Var3,Y					;X = held object's slot
+
+	LDA Objects_State,X					;get held object slots state
+	CMP #OBJSTATE_SHELLED
+	
+	BNE Buster_ThrowNormal
+	BEQ Buster_ThrowKicked
+	
+Buster_Throw:
+	LDY <SlotIndexBackup				;Y = Buster's slot index
+
+	LDA <Objects_Var5,X					;if object, no need to check for empty slot
+	BMI Buster_ThrowObject				;bit 7 set(object), go to Buster_ThrowObject
+	
+	LDX #$04	 						;X = 4 for the find dead/empty loop, check slots 4, 3, 2, 1, 0
 
 PRG002_A5A4:
 	LDA Objects_State,X
-	BEQ PRG002_A5AE	 ; If this object slot's state is Dead/Empty, jump to PRG002_A5AE
-
-	DEX		 ; X--
-	BPL PRG002_A5A4	 ; While X >= 0, loop!
-	BMI PRG002_A5F8	 ; Otherwise, jump to PRG002_A5F8
+	BEQ PRG002_A5AE						;If this object slot's state is Dead/Empty, jump to PRG002_A5AE
+										;and use it for the ice block
+	DEX		 							;X--
+	BPL PRG002_A5A4	 					;While X >= 0, loop!
+	BMI Buster_RTS	 					;Otherwise RTS, jump to Buster_RTS. Do Nothing
 
 PRG002_A5AE:
-	JSR Level_PrepareNewObject	; Generate new object for tossed ice block
+	JSR Level_PrepareNewObject			;Generate new object for tossed ice block
+										;essentially clear variables for that object slot
+										;X=new object slot
+										;Y=busters slot
 
-	LDY <SlotIndexBackup	 ; Y = Buster's slot index
-
-	; Var5 and Frame = 0
-	LDA #$00
-	STA Objects_Var5,Y
-	STA Objects_Frame,Y
-
-	; Set Ice Block to state Kicked
-	LDA #OBJSTATE_KICKED
-	STA Objects_State,X
-
-	; It's an Ice Blocj
-	LDA #OBJ_ICEBLOCK
+	LDA #OBJ_ICEBLOCK					;It's an Ice Blocj
 	STA Level_ObjectID,X
 
-	; Set Frame = 2
-	LDA #$02
-	STA Objects_Frame,X
+	LDA #$02							;Set ice blocks animation Frame = 2
+	STA Objects_Frame,X					;not sure why, but if you remove this the graphic is messed up
 
-	; Set expiration timer
-	LDA #$ff
+	;LDA #$ff							;dead code, ice blocks timer3 only matters in shelled/held state
+	;STA Objects_Timer3,X
+
+Buster_ThrowKicked:
+	LDA #OBJSTATE_KICKED				;set ice block to kicked
+Buster_ThrowNormal:
+	STA Objects_State,X					;actually set the state of the thrown object
+
+	LDA #$ff							;sets the koopa wake up timer
 	STA Objects_Timer3,X
 
-	; Set X
-	LDA Objects_X,Y
+	JSR Buster_SetObjectPos
+
+	LDA Objects_FlipBits,Y
+
+;set throw velocity
+	LDY #$30	 						;Y = $30
+	ASL A
+	BMI PRG002_A5F2	 					;If Buster's turned around, jump to PRG002_A5F2
+	LDY #-$30	 						;Otherwise, Y = -$30
+
+PRG002_A5F2:
+	STY <Objects_XVel,X					;Set X velocity dependent on the above
+
+	LDA #-$30							;Set Y velocity
+	STA <Objects_YVel,X
+
+;Clear busters "is holding something" flag and frame for visuals
+;also stores the x throw vel to the objects slot, until it's cleared when hitting floor
+Buster_ClearVar:
+	TYA									;move the previous throw x velocity to A
+	STA Buster_ThrowFlag,X				;store the thrown x vel to the thrown object
+	LDX <SlotIndexBackup				;X = busters slot	
+	LDA #$00							;buster threw, do some clearing
+	STA <Objects_Var5,X					;clear busters var5 deciding whether it's holding or not
+	STA Objects_Frame,X					;zero busters frame, to drop his arms visually
+	RTS		 							;Return
+
+Buster_RTS:
+	LDX <SlotIndexBackup				;X = object slot index
+	RTS		 							;Return
+
+;Buster Draw
+Buster_DrawHoldingIceBrick:
+	JSR Object_ShakeAndCalcSprite
+
+	LDA <Temp_Var3
+	BPL PRG002_A641	 					;If object is not vertically flipped, jump to PRG002_A641
+
+	LDX <SlotIndexBackup	 			;X = object slot index
+
+	LDA <Objects_Var4,X	
+	TAX		 							;X = Var4 (lift offset index)
+
+
+	LDA <Temp_Var1						;Offset sprite Y by the index given in Var4
+	ADD Buster_BlockLiftYOff,X
+	STA <Temp_Var1	
+
+	LDX <Temp_Var6		 				;X = Var6
+
+PRG002_A641:
+	JSR Object_Draw16x16Sprite	 		;Draw Buster
+
+	LDX <SlotIndexBackup				;X = object slot index
+	
+	LDA <Objects_Var5,X
+	BEQ Buster_RTS	 					;var5=0 -> RTS
+										;var5=nonzero -> fall through
+	BMI Buster_DrawHoldingObject		;var5=80 -> jump to Buster_DrawHoldingObject (bit 7 set(object))
+										;var5=1 -> continue with original ice brick draw (bit 7 clear(tile))
+
+	; Var5 = 1 (Ice Brick)
+	;PHA								;Save Var5 not sure why they did this
+	LDA <Objects_SpriteY,X
+	LDY <Objects_Var4,X	 				;Y = Var4
+	BIT <Temp_Var3
+	BMI PRG002_A657	 					;If vertically flipped, jump to PRG002_A657
+
+										;Adds an offset in case Buster's holding a block... but since it's
+										;applied all the time, it just looks odd otherwise...
+	ADD Buster_BlockLiftYOff,Y
+
+PRG002_A657:
+	STA <Temp_Var1		 				;Update Sprite Y
+
+	LDA Buster_BlockLiftXOff,Y
+	BIT <Temp_Var3
+	BVS PRG002_A663	 					;If Buster is horizontally flipped, jump to PRG002_A663
+
+	JSR Negate	 						;Negate the X offset if he's flipped around
+
+PRG002_A663:
+	ADD <Temp_Var2						;Apply X offset
+	STA <Temp_Var2						;Update Sprte X
+
+	LDA Level_NoStopCnt
+	AND #$03							;Palette select 0-3
+	STA <Temp_Var4						;Custom color cycling on the ice brick he's holding
+	;PLA								;Restore Var5 not sure why they did this
+	;TAY								;unnecessary, clobbered by the next TAY
+	LDX #$BE	 						; X = $BE (Ice Brick tile)
+	LDA <Temp_Var7
+	ADD #$08	
+	TAY									;Y = Sprite_RAM + 8
+
+	JSR Object_Draw16x16Sprite
+
+	LDA Sprite_RAM+$02,Y				;Draw Ice Brick
+	AND #~SPR_HFLIP
+	STA Sprite_RAM+$02,Y
+	ORA #SPR_HFLIP
+	STA Sprite_RAM+$06,Y
+	
+	BNE Buster_RTS
+
+Buster_DrawHoldingObject:
+	LDY <SlotIndexBackup				;Y=busters slot
+	LDX Objects_Var3,Y					;X=held object slot
+	
+	LDA Objects_State,Y					;check if buster is killed, this routine still runs while he's on screen
+										;release his held object, or kill his held object when killed
+	CMP #OBJSTATE_KILLED				;otherwise continue like nothing is wrong
+	BEQ Buster_ClearVar					;clears vars, restore buster slot to x, RTS
+	
+	;LDA Objects_FlipBits,Y				;flip him accordingly
+	;STA Objects_FlipBits,X				;removing this as a simple fix to the homing bullet bill visuals
+
+	JSR Buster_SetObjectPos				;move held object above busters head
+	
+	LDA #$00							;set held objects velocity to 0 every frame it's being held
+	STA <Objects_XVel,X
+	STA <Objects_YVel,X
+	BEQ Buster_RTS						;restore x=busters slot and RTS
+	
+Buster_SetObjectPos:
+	LDA Objects_X,Y						; Set X
 	STA <Objects_X,X
 
-	; Set X Hi
-	LDA Objects_XHi,Y
+	LDA Objects_XHi,Y					; Set X Hi
 	STA <Objects_XHi,X
 
-	; Set Y/Hi
-	LDA Objects_Y,Y
+	LDA Objects_Y,Y						; Set Y/Hi
 	SUB #16
 	STA <Objects_Y,X
 	LDA Objects_YHi,Y
 	SBC #$00
 	STA <Objects_YHi,X
-
-	LDA Objects_FlipBits,Y
-
-	LDY #$30	 ; Y = $30
-	ASL A
-	BMI PRG002_A5F2	 ; If Buster's turned around, jump to PRG002_A5F2
-	LDY #-$30	 ; Otherwise, Y = -$30
-PRG002_A5F2:
-	STY <Objects_XVel,X
-
-	; Set Y velocity
-	LDA #-$30
-	STA <Objects_YVel,X
-
-PRG002_A5F8:
-	LDX <SlotIndexBackup		 ; X = object slot index
-	RTS		 ; Return
-
-Buster_BlockLiftXOff:
-	.byte $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $02, $03, $02, $01, $00
-	.byte $01, $03, $05, $07, $08, $09, $0A, $0A
-
-Buster_BlockLiftYOff:
-	.byte -$0E, -$0E, -$0E, -$0E, -$0E, -$0E, -$0E, -$0E, -$0E, -$0E, -$0E, -$0D
-	.byte -$0C, -$0D, -$0E, -$0E, -$0F, -$0E, -$0D, -$0B, -$09, -$06, -$03, $00 
-
-Buster_DrawHoldingIceBrick:
-	JSR Object_ShakeAndCalcSprite	 
-
-	LDA <Temp_Var3
-	BPL PRG002_A641	 ; If object is not vertically flipped, jump to PRG002_A641
-
-	LDX <SlotIndexBackup	 ; X = object slot index
-
-	LDA <Objects_Var4,X
-	TAX		 	; X = Var4 (lift offset index)
-
-	; Offset sprite Y by the index given in Var4
-	LDA <Temp_Var1
-	ADD Buster_BlockLiftYOff,X
-	STA <Temp_Var1	
-
-	LDX <Temp_Var6		 ; X = Var6
-
-PRG002_A641:
-	JSR Object_Draw16x16Sprite	 ; Draw Buster
-
-	LDX <SlotIndexBackup	 ; X = object slot index
-
-	LDA <Objects_Var5,X
-	BEQ PRG002_A68B	 	; If Var5 = 0 (not holding brick), jump to PRG002_A68B (RTS)
-
-	; Var5 not zero...
-
-	PHA		 	; Save Var5
-
-	LDA <Objects_SpriteY,X
-
-	LDY <Objects_Var4,X	 ; Y = Var4
-
-	BIT <Temp_Var3
-	BMI PRG002_A657	 	; If vertically flipped, jump to PRG002_A657
-
-	; Adds an offset in case Buster's holding a block... but since it's
-	; applied all the time, it just looks odd otherwise...
-	ADD Buster_BlockLiftYOff,Y
-
-PRG002_A657:
-	STA <Temp_Var1		 ; Update Sprite Y
-
-	LDA Buster_BlockLiftXOff,Y
-	BIT <Temp_Var3
-	BVS PRG002_A663	 ; If Buster is horizontally flipped, jump to PRG002_A663
-
-	JSR Negate	 ; Negate the X offset if he's flipped around
-
-PRG002_A663:
-	ADD <Temp_Var2	; Apply X offset
-	STA <Temp_Var2	; Update Sprte X
-
-	LDA Level_NoStopCnt
-	AND #$03	; Palette select 0-3
-	STA <Temp_Var4	; Custom color cycling on the ice brick he's holding
-
-	PLA		 ; Restore Var5
-	TAY		 ; -> 'Y'
-
-	LDX #$BE	 ; X = $BE (Ice Brick tile)
-
-	LDA <Temp_Var7
-	ADD #$08	
-	TAY		 ; Y = Sprite_RAM + 8
-
-	JSR Object_Draw16x16Sprite
-
-	; Draw Ice Brick
-	LDA Sprite_RAM+$02,Y
-	AND #~SPR_HFLIP
-	STA Sprite_RAM+$02,Y
-	ORA #SPR_HFLIP
-	STA Sprite_RAM+$06,Y
-
-	LDX <SlotIndexBackup		 ; X = object slot index
-
-PRG002_A68B:
-	RTS		 ; Return
+	RTS
 
 ObjInit_PipewayCtlr:
 	; Changes Objects_Y into a grid row position (including the high) rather than a pixel position
@@ -3884,63 +4016,63 @@ PRG002_B325:
 
 	; English: "Pick a box." / "Its contents" / "will help you" / "on your way"
 ToadMsg_Standard:
-	;            P    i    c    k         a         b    o    x    .
-	.byte $FE, $BF, $D8, $D2, $DA, $FE, $D0, $FE, $D1, $DE, $88, $E9, $FE, $FE, $FE
-
-	;            I    t    s         c    o    n    t    e    n    t    s
-	.byte $FE, $B8, $CD, $CC, $FE, $D2, $DE, $DD, $CD, $D4, $DD, $CD, $CC, $FE, $FE
-
-	;            w    i    l    l         h    e    l    p         y    o    u
-	.byte $FE, $81, $D8, $DB, $DB, $FE, $D7, $D4, $DB, $DF, $FE, $8C, $DE, $CE, $FE
-
-	;            o    n         y    o    u    r         w    a    y    .
-	.byte $FE, $DE, $DD, $FE, $8C, $DE, $CE, $CB, $FE, $81, $D0, $8C, $E9, $FE, $FE
-
-	;
-	.byte $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE
-
-	;
-	.byte $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE
-
-	; English: "One toot on" / "this whistle" / "will send you" / "to a far away" / "land!"
+;	;            P    i    c    k         a         b    o    x    .
+;	.byte $FE, $BF, $D8, $D2, $DA, $FE, $D0, $FE, $D1, $DE, $88, $E9, $FE, $FE, $FE
+;
+;	;            I    t    s         c    o    n    t    e    n    t    s
+;	.byte $FE, $B8, $CD, $CC, $FE, $D2, $DE, $DD, $CD, $D4, $DD, $CD, $CC, $FE, $FE
+;
+;	;            w    i    l    l         h    e    l    p         y    o    u
+;	.byte $FE, $81, $D8, $DB, $DB, $FE, $D7, $D4, $DB, $DF, $FE, $8C, $DE, $CE, $FE
+;
+;	;            o    n         y    o    u    r         w    a    y    .
+;	.byte $FE, $DE, $DD, $FE, $8C, $DE, $CE, $CB, $FE, $81, $D0, $8C, $E9, $FE, $FE
+;
+;	;
+;	.byte $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE
+;
+;	;
+;	.byte $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE
+;
+;	; English: "One toot on" / "this whistle" / "will send you" / "to a far away" / "land!"
 ToadMsg_WarpWhistle:
-	;       O    n    e         t    o    o    t         o    n
-	.byte $BE, $DD, $D4, $FE, $CD, $DE, $DE, $CD, $FE, $DE, $DD, $FE, $FE, $FE, $FE
-
-	;       t    h    i    s         w    h    i    s    t    l    e
-	.byte $CD, $D7, $D8, $CC, $FE, $81, $D7, $D8, $CC, $CD, $DB, $D4, $FE, $FE, $FE
-
-	;       w    i    l    l         s    e    n    d         y    o    u
-	.byte $81, $D8, $DB, $DB, $FE, $CC, $D4, $DD, $D3, $FE, $8C, $DE, $CE, $FE, $FE
-
-	;       t    o         a         f    a    r         a    w    a    y
-	.byte $CD, $DE, $FE, $D0, $FE, $D5, $D0, $CB, $E5, $D0, $81, $D0, $8C, $FE, $FE
-
-	;       l    a    n    d    !
-	.byte $DB, $D0, $DD, $D3, $EA, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE
-
-	;
-	.byte $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE
-
-	; English: "Hello! You" / "found my shop" / "of strange and" / "wonderful" / "things!"
+;	;       O    n    e         t    o    o    t         o    n
+;	.byte $BE, $DD, $D4, $FE, $CD, $DE, $DE, $CD, $FE, $DE, $DD, $FE, $FE, $FE, $FE
+;
+;	;       t    h    i    s         w    h    i    s    t    l    e
+;	.byte $CD, $D7, $D8, $CC, $FE, $81, $D7, $D8, $CC, $CD, $DB, $D4, $FE, $FE, $FE
+;
+;	;       w    i    l    l         s    e    n    d         y    o    u
+;	.byte $81, $D8, $DB, $DB, $FE, $CC, $D4, $DD, $D3, $FE, $8C, $DE, $CE, $FE, $FE
+;
+;	;       t    o         a         f    a    r         a    w    a    y
+;	.byte $CD, $DE, $FE, $D0, $FE, $D5, $D0, $CB, $E5, $D0, $81, $D0, $8C, $FE, $FE
+;
+;	;       l    a    n    d    !
+;	.byte $DB, $D0, $DD, $D3, $EA, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE
+;
+;	;
+;	.byte $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE
+;
+;	; English: "Hello! You" / "found my shop" / "of strange and" / "wonderful" / "things!"
 ToadMsg_AnchorPWing:
-	;            H    e    l    l    o    !         Y    o    u
-	.byte $FE, $B7, $D4, $DB, $DB, $DE, $EA, $FE, $C8, $DE, $CE, $FE, $FE, $FE, $FE
-
-	;            f    o    u    n    d         m    y         s    h    o    p
-	.byte $FE, $D5, $DE, $CE, $DD, $D3, $FE, $DC, $8C, $FE, $CC, $D7, $DE, $DF, $FE
-
-	;            o    f         s    t    r    a    n    g    e         a    n    d
-	.byte $FE, $DE, $D5, $FE, $CC, $CD, $CB, $D0, $DD, $D6, $D4, $FE, $D0, $DD, $D3
-
-	;            w    o    n    d    e    r    f    u    l
-	.byte $FE, $81, $DE, $DD, $D3, $D4, $CB, $D5, $CE, $DB, $FE, $FE, $FE, $FE, $FE
-
-	;            t    h    i    n    g    s    !
-	.byte $FE, $CD, $D7, $D8, $DD, $D6, $CC, $EA, $FE, $FE, $FE, $FE, $FE, $FE, $FE
-
-	;
-	.byte $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE
+;	;            H    e    l    l    o    !         Y    o    u
+;	.byte $FE, $B7, $D4, $DB, $DB, $DE, $EA, $FE, $C8, $DE, $CE, $FE, $FE, $FE, $FE
+;
+;	;            f    o    u    n    d         m    y         s    h    o    p
+;	.byte $FE, $D5, $DE, $CE, $DD, $D3, $FE, $DC, $8C, $FE, $CC, $D7, $DE, $DF, $FE
+;
+;	;            o    f         s    t    r    a    n    g    e         a    n    d
+;	.byte $FE, $DE, $D5, $FE, $CC, $CD, $CB, $D0, $DD, $D6, $D4, $FE, $D0, $DD, $D3
+;
+;	;            w    o    n    d    e    r    f    u    l
+;	.byte $FE, $81, $DE, $DD, $D3, $D4, $CB, $D5, $CE, $DB, $FE, $FE, $FE, $FE, $FE
+;
+;	;            t    h    i    n    g    s    !
+;	.byte $FE, $CD, $D7, $D8, $DD, $D6, $CC, $EA, $FE, $FE, $FE, $FE, $FE, $FE, $FE
+;
+;	;
+;	.byte $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE
 
 	; Pointer table to Toad's three messages
 	; Warp Whistle
@@ -6328,8 +6460,7 @@ PRG002_BFD3:
 	RTS		 ; Return
 
 	; ?? Someone wanna claim this?
-PRG002_BFD4:
-	.byte $FC, $A9, $00, $22, $0B, $01, $A9, $22, $14, $01, $A9, $22, $29, $04, $A9, $FC
-	.byte $FC, $A9, $22, $33, $04, $A9, $FC, $FC, $A9, $22, $4A, $04, $A9, $A9, $FC, $A9
-	.byte $22, $52, $04, $A9, $FC, $A9, $A9, $22, $6C, $48, $A9, $00
-
+;PRG002_BFD4:
+;	.byte $FC, $A9, $00, $22, $0B, $01, $A9, $22, $14, $01, $A9, $22, $29, $04, $A9, $FC
+;	.byte $FC, $A9, $22, $33, $04, $A9, $FC, $FC, $A9, $22, $4A, $04, $A9, $A9, $FC, $A9
+;	.byte $22, $52, $04, $A9, $FC, $A9, $A9, $22, $6C, $48, $A9, $00

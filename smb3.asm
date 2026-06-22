@@ -2602,7 +2602,9 @@ CFIRE_LASER		= $15	; Laser fire
 
 	SoundEngineBackupArray:	.ds 30
 	SoundEngineBackedUp:	.ds 1
-							.ds 78	; $7A73-$7ADF unused
+	
+	Buster_ThrowFlag:	 .ds 8 ;used to track objects thrown by buster and set velocities accordingly
+							.ds 70	;  unused
 
 	Music_Start:		.ds 1	; Music start index (beginning of this song)
 	Music_End:		.ds 1	; Music end index (inclusive last index to play before loop)
