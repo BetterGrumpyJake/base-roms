@@ -4952,13 +4952,15 @@ PRG008_B6E4:
 	INY
 	INY		 ; Y += 3 (consider next 3 tiles for moving upward)
 
-	LDA Level_TilesetIdx
-	CMP #$08	 
-	BNE PRG008_B6EF	 ; If Level_TilesetIdx <> 8 (desert levels), jump to PRG008_B6EF
-	INY		 ; Otherwise, Y += 1 (and in the desert only, the UNUSED breakable pipeworks tile)
+	;LDA Level_TilesetIdx
+	;CMP #$08	 
+	;BNE PRG008_B6EF	 ; If Level_TilesetIdx <> 8 (desert levels), jump to PRG008_B6EF
+	;INY		 ; Otherwise, Y += 1 (and in the desert only, the UNUSED breakable pipeworks tile)
 
 PRG008_B6EF:
 	LDA Level_Tile_GndL,X	 ; Get tile index
+	CMP #TILEA_MUNCHER
+	BEQ PRG008_B6FB
 	SUB Level_ActionTiles,Y
 	CMP Level_ActionTiles_Range,Y
 	BCC PRG008_B701	 ; If the tile is in range, jump to PRG008_B701!
