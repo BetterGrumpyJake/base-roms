@@ -1714,16 +1714,24 @@ PRG008_A86C:
 	; VINE CLIMBING LOGIC
 
 	LDA Player_InWater
-	ORA Player_IsHolding
 	ORA Player_Kuribo
-	BNE PRG008_A890	 ; If Player is in water, holding something, or in Kuribo's shoe, jump to PRG008_A890
+	BNE PRG008_A890				; If Player is in water or in Kuribo's shoe, jump to PRG008_A890
 
 	LDA <Temp_Var1
 	CMP #TILE1_VINE
 	BNE PRG008_A890	 ; If tile is not the vine, jump to PRG008_A890
+;tile is vine
 
 	LDA Player_IsClimbing
 	BNE PRG008_A898	 ; If climbing flag is set, jump to PRG008_A898
+;player not currently climbing
+
+	LDA Player_IsHolding
+	BNE PRG008_A890	 			; If Player is holding something jump to PRG008_A890
+;is not holding something
+
+	LDA <Player_YVel		;if not falling, do not allow grabbing the vine
+	BMI PRG008_A890
 
 	LDA <Pad_Holding
 	AND #(PAD_UP | PAD_DOWN)
@@ -1742,6 +1750,15 @@ PRG008_A890:
 	JMP PRG008_A8F9	 ; Jump to PRG008_A8F9
 
 PRG008_A898:
+	LDA <Pad_Input		;check if a is pressed otherwise keep climbing
+	AND #PAD_A
+	BEQ VineJumpSkip
+
+	LDA #$00			;clear Player_InAir(allowing jumping) and let A890 clear Player_IsClimbing
+    STA <Player_InAir
+    BEQ PRG008_A890
+
+VineJumpSkip:
 	LDA #$01
 	STA Player_IsClimbing	 ; Player_IsClimbing = 1 (Player is climbing)
 
@@ -1788,7 +1805,7 @@ PRG008_A8C8:
 	STY <Player_YVel  ; Set Player's Y Velocity
 
 PRG008_A8CA:
-	LDY #$10	 ; Y = $10 (rightward X velocity)
+	LDY #$08	 ; Y = $10 (rightward X velocity)
 
 	LDA <Pad_Holding
 	AND #(PAD_LEFT | PAD_RIGHT)
@@ -1797,7 +1814,7 @@ PRG008_A8CA:
 	AND #PAD_LEFT
 	BEQ PRG008_A8D8	 ; If Player is NOT pressing LEFT, jump to PRG008_A8D8
 
-	LDY #-$10	 ; Y = -$10 (leftward X velocity)
+	LDY #-$08	 ; Y = -$10 (leftward X velocity)
 
 PRG008_A8D8:
 	STY <Player_XVel ; Set Player's X Velocity
@@ -1823,6 +1840,7 @@ PRG008_A8EC:
 	JSR Player_ApplyXVelocity
 	JSR Player_ApplyYVelocity
 
+	JSR Player_FlipDirection	;flip marios direction when pressing left/right
 	JSR Player_DoClimbAnim	 ; Animate climbing
 	JSR Player_Draw29	 ; Draw Player
 	RTS		 ; Return
@@ -2975,58 +2993,10 @@ PRG008_AE03:
 
 PRG008_AE11:
 	LDA Player_TailAttack
-	BNE PRG008_AE26	 ; If Player is performing tail attack, jump to PRG008_AE26
+	BNE PRG008_AE58	 ; If Player is performing tail attack, jump to PRG008_AE58
 
-	LDA <Pad_Holding
-	AND #(PAD_LEFT | PAD_RIGHT)
-	BEQ PRG008_AE26	 ; If Player is NOT pressing left or right, jump to PRG008_AE26
-
-	; Player is pressing left/right
-
-	LDY #$00	; No flip
-
-	AND #%00000010
-	BNE PRG008_AE24	 ; If Player is pressing left, jump to PRG008_AE24
-
-	LDY #SPR_HFLIP	; Horizontal flip
-
-PRG008_AE24:
-	STY <Player_FlipBits	; Set appropriate flip
-
-PRG008_AE26:
-	LDA Debug_Flag
-	CMP #$80
-	BNE PRG008_AE58	 ; If we're not in debug mode, jump to PRG008_AE58
-
-	; DEBUG SUIT/POWER-UP SWITCH AND KURIBO TOGGLE
-
-	LDA <Pad_Input
-	AND #PAD_SELECT
-	BEQ PRG008_AE58	 ; If Player is NOT pressing select, jump to PRG008_AE58
-
-	LDA <Pad_Holding
-	AND #(PAD_A | PAD_B)
-	BNE PRG008_AE50	 ; If Player is holding A or B, jump to PRG008_AE50
-
-
-	; In short, cycle through power-up 0-6 (all power ups)
-	LDA <Player_Suit
-	ADD #$01
-	STA Player_QueueSuit
-	CMP #(PLAYERSUIT_LAST+1)	; +1 because it's by Player_QueueSuit
-	BLS PRG008_AE47			; If not the last suit, jump to PRG008_AE47
-	LDA #$00
-PRG008_AE47:
-	STA Player_QueueSuit
-	INC Player_QueueSuit
-	JMP PRG008_AE58	 ; Jump to PRG008_AE58
-
-PRG008_AE50:
-
-	; Kuribo's shoe toggle!
-	LDA Player_Kuribo
-	EOR #$01
-	STA Player_Kuribo
+	JSR Player_FlipDirection		;move the flipping of mario to a seperate subroutine
+									;flip marios direction when pressing left/right
 
 PRG008_AE58:
 	LDA <Player_Suit
@@ -6966,5 +6936,21 @@ PRG008_BFF9:
 	RTS		 ; Return
 
 ; Rest of ROM bank was empty
+Player_FlipDirection:
+	LDA <Pad_Holding
+	AND #(PAD_LEFT | PAD_RIGHT)
+	BEQ SetFlipReturn	 ; If Player is NOT pressing left or right, jump to PRG008_AE26
 
+	; Player is pressing left/right
 
+	LDY #$00	; No flip
+
+	AND #%00000010
+	BNE SetFlip	 ; If Player is pressing left, RTS
+
+	LDY #SPR_HFLIP	; Horizontal flip
+
+SetFlip:
+	STY <Player_FlipBits	; Set appropriate flip
+SetFlipReturn:
+	RTS
