@@ -2478,7 +2478,12 @@ Tile_Mem:	.ds 6480	; $6000-$794F Space used to store the 16x16 "tiles" that make
 
 	Player_NoSlopeStick:	.ds 1	; If set, Player does not stick to slopes (noticeable running downhill)
 
-				.ds 105	; $7997-$79FF unused
+;my constants
+	ThrowDirection: 	.ds 1		;$7997 flag for up, down, or neither for shells
+	Objects_UpDrop: 	.ds 8		;$7998-$799F, flag for drop tricks per object slot
+	Buster_ThrowFlag:	.ds 8 		;$79A0-$79A8 used to track objects thrown by buster and set velocities accordingly
+	
+						.ds 88	; $79A9-$79FF unused
 	; Auto scroll effect variables -- everything to do with screens that aren't scrolling in the normal way
 	; NOTE: Post-airship cinematic scene with Toad and King ONLY uses $7A01-$7A11 MMC3 SRAM (from Level_AScrlSelect to Level_AScrlHVelCarry)
 
@@ -2603,8 +2608,7 @@ CFIRE_LASER		= $15	; Laser fire
 	SoundEngineBackupArray:	.ds 30
 	SoundEngineBackedUp:	.ds 1
 	
-	Buster_ThrowFlag:	 .ds 8 ;used to track objects thrown by buster and set velocities accordingly
-							.ds 70	;  unused
+							.ds 78	;  unused
 
 	Music_Start:		.ds 1	; Music start index (beginning of this song)
 	Music_End:		.ds 1	; Music end index (inclusive last index to play before loop)

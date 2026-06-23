@@ -566,25 +566,25 @@ PRG000_C3E7:
 ; FIXME: Anybody want to claim this?
 ; Looks like maybe a leftover debug routine for some kind of "float around" mode maybe!!
 ; $C3EA 
-	LDA <Pad_Holding
-	AND #(PAD_LEFT | PAD_RIGHT)
-	TAY		 ; Y = 1 or 2
-
-	; Set Player X velocity directly??
-	LDA PRG000_C3E7,Y
-	STA <Player_XVel
-
-	LDA <Pad_Holding
-	LSR A
-	LSR A
-	AND #((PAD_UP | PAD_DOWN) >> 2)
-	TAY		 ; Y = 1 or 2
-
-	; Set Player Y velocity directly??
-	LDA PRG000_C3E7,Y
-	STA <Player_YVel
-
-	RTS		 ; Return
+;	LDA <Pad_Holding
+;	AND #(PAD_LEFT | PAD_RIGHT)
+;	TAY		 ; Y = 1 or 2
+;
+;	; Set Player X velocity directly??
+;	LDA PRG000_C3E7,Y
+;	STA <Player_XVel
+;
+;	LDA <Pad_Holding
+;	LSR A
+;	LSR A
+;	AND #((PAD_UP | PAD_DOWN) >> 2)
+;	TAY		 ; Y = 1 or 2
+;
+;	; Set Player Y velocity directly??
+;	LDA PRG000_C3E7,Y
+;	STA <Player_YVel
+;
+;	RTS		 ; Return
 
 	; Offsets into Sprite_RAM used by objects
 SprRamOffsets:
@@ -2178,10 +2178,15 @@ PRG000_CB10:
 
 	JSR Object_ShellDoWakeUp	 ; Handle waking up (MAY not return here, if object "wakes up"!) 
 	JSR Object_Move	 		; Perform standard object movements
+	
+	JSR AirborneShellKill_30 ;handle up and down kicked shells kill enemies
  
 	LDA <Objects_DetStat,X 
 	AND #$04 
-	BEQ PRG000_CB45	 ; If object hit floor, jump to PRG000_CB45 
+	BEQ PRG000_CB45	 ; If object DOES NOT hit floor, jump to PRG000_CB45
+	
+	LDA #$00			;if shell touches ground, clear the flag
+	STA Objects_UpDrop,X
 
 	LDA <Objects_YVel,X 
 	BMI PRG000_CB45	 ; If object is moving upward, jump to PRG000_CB45 
@@ -2227,8 +2232,9 @@ PRG000_CB45:
 	BEQ PRG000_CB4F	 ; If object has NOT hit ceiling, jump to PRG000_CB4F
  
 	; Set object Y velocity to $10 (rebound off ceiling)
-	LDA #$10 
-	STA <Objects_YVel,X 
+	;LDA #$10 
+	;STA <Objects_YVel,X
+	JSR HitCeilingBumpBlocks_30		;when shell hits ceiling redetect coords and bump blocks
 
 PRG000_CB4F:
 	LDA <Objects_DetStat,X 
@@ -2236,6 +2242,12 @@ PRG000_CB4F:
 	BEQ PRG000_CB58	 ; If object has NOT hit wall, jump to PRG000_CB58 
  
 	JSR Object_AboutFace	 ; Turn around... 
+	
+	LDA <Objects_XVel,X
+	CMP #$80                            ;A >= $80 -> carry set (number was negative)
+                                        ;A < $80 -> carry clear (number was positive)
+    ROR A
+	STA <Objects_XVel,X
 
 PRG000_CB58:
 	JSR Object_HandleBumpUnderneath	 ; Handle object getting hit from underside 
@@ -2585,6 +2597,7 @@ PRG000_CCF4:
 PRG000_CCF7: 
 	JSR Object_HandleBumpUnderneath	 ; Handle the kicked shelled object getting hit from underneath
  
+ DoUpDownKill_00:
 	TXA 
 	ADD <Counter_1 
 	LSR A 
@@ -2816,21 +2829,30 @@ ObjState_Held:
 PRG000_CE28:
 	JSR Object_ShellDoWakeUp ; Wake up while Player is holding object... 
 	BIT <Pad_Holding 
-	BVC Player_KickObject	 ; If Player is NOT holding B button, jump to Player_KickObject  
+	;BVC Player_KickObject	 ; If Player is NOT holding B button, jump to Player_KickObject
+	BVC _check_throw_dir
 
 PRG000_CE2F:
 	JMP PRG000_CEEF	 ; Jump to PRG000_CEEF
+	
+_check_throw_dir:
+	JSR SetThrowDirection
 
 
 Player_KickObject:
 	LDA Level_PipeMove	 
 	BNE PRG000_CE2F	 ; If Player is moving through pipes, jump to PRG000_CE2F (PRG000_CEEF)
+	
+	LDA ThrowDirection		;skip kick sound on shell drop
+	AND #PAD_DOWN
+	BNE SkipKickSound
 
 	; Play kick sound
 	LDA Sound_QPlayer
 	ORA #SND_PLAYERKICK
 	STA Sound_QPlayer
 
+SkipKickSound:
 	; Have Player do kick frame
 	LDA #$0c
 	STA Player_Kick
@@ -2891,9 +2913,9 @@ PRG000_CE79:
 
 	; This object is being held by Player...
 
-	LDA Level_ObjectID,X
-	CMP #OBJ_ICEBLOCK
-	BEQ PRG000_CEB4	 ; If this is an ice block, jump to PRG000_CEB4
+	;LDA Level_ObjectID,X
+	;CMP #OBJ_ICEBLOCK
+	;BEQ PRG000_CEB4	 ; If this is an ice block, jump to PRG000_CEB4
 
 	LDY #1	 ; Y = 1
 
@@ -2910,26 +2932,28 @@ PRG000_CE94:
 	LDA <Objects_DetStat,X
 	AND #$03	
 	BEQ PRG000_CEB4	 ; If object has not hit a wall, jump to PRG000_CEB4
+	
+	JSR WallPopOut
 
 	; KICK OBJECT INTO WALL LOGIC
 
 	; Flat 100 points
-	LDA #$05
-	JSR Score_PopUp
-
-	; Object state is Killed
-	LDA #OBJSTATE_KILLED
-	STA Objects_State,X
-
-	; Set object Y velocity to -$40 (fly up a bit)
-	LDA #-$40
-	STA <Objects_YVel,X
-
-	; Remove that minimum X velocity
-	LDA #$00
-	STA <Objects_XVel,X
-
-	JMP PRG000_CF98	 ; Jump to PRG000_CF98
+;	LDA #$05
+;	JSR Score_PopUp
+;
+;	; Object state is Killed
+;	LDA #OBJSTATE_KILLED
+;	STA Objects_State,X
+;
+;	; Set object Y velocity to -$40 (fly up a bit)
+;	LDA #-$40
+;	STA <Objects_YVel,X
+;
+;	; Remove that minimum X velocity
+;	LDA #$00
+;	STA <Objects_XVel,X
+;
+;	JMP PRG000_CF98	 ; Jump to PRG000_CF98
 
 PRG000_CEB4:
 
@@ -2981,8 +3005,9 @@ PRG000_CEDC:
 PRG000_CEE8:
 
 	; Set object's Y velocity to zero
-	LDA #$00
-	STA <Objects_YVel,X
+	;LDA #$00
+	;STA <Objects_YVel,X
+	JSR SetKickedVel_30
 
 	JMP PRG000_CF98	 ; Jump to PRG000_CF98
 
@@ -4413,6 +4438,7 @@ PRG000_D4C8:
 	STA Objects_Var12,X
 	STA Objects_Var13,X
 	STA Objects_Var14,X
+	STA Objects_UpDrop,X ;clear the was it up thrown/dropped flag
 
 PRG000_D506:
 	RTS		 ; Return

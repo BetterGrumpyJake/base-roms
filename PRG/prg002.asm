@@ -948,7 +948,10 @@ BusterObjectTable:						;what objects can buster pickup
 	.byte OBJ_GREENTROOPA				;$6C green koopa troopa
 	.byte OBJ_REDTROOPA					;$6D red koopa troopa
 	.byte OBJ_BULLETBILL				;$78 Regular Bullet bill
-	.byte OBJ_BUSTERBEATLE
+	.byte OBJ_BUSTERBEATLE				;$40 Buster Beatle
+	.byte OBJ_NIPPER					;$33 Stationary nipper plant
+	.byte OBJ_NIPPERHOPPING				;$39 Hopping nipper plant
+	.byte OBJ_NIPPERFIREBREATHER		;$3D Fire belching nipper plant
 
 ;size of table, regardless if added to/subtracted from
 BusterObjectTableSize = * - BusterObjectTable

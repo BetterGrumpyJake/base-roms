@@ -3644,7 +3644,125 @@ AllowDeathSongToContinueMusic:
 	RTS
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	;; Removed 2-player vs and game over
-	.ds 0x14C
+	
+;;;;;ThrowDirection is for deciding Y velocities
+;;;;;Objects_UpDrop is per object, whether it was up thrown or dropped
+ThrownYVels:
+	;     n/a  DOWN  UP
+	.byte $00, -$04, -$60
+	
+SetKickedVel_30:
+	LDA #$00						;zero shells y vel, what we removed from prg0
+	STA <Objects_YVel,X		
+			
+;shell drop trick checks		
+	LDY ThrowDirection
+	BNE UpDownThrowVel				;if ThrowDirection=$00(regular kick) continue
+	
+	LDA Objects_UpDrop,X			;if this object slot was dropped, use drop trick velocity
+	CMP #$04
+	BEQ DropTrickVel
+UpDownThrowVel:
+	CPY #$00						;Y still holds ThrowDirection
+	BEQ KickedShellReturn			;if ThrowDirection=$00 RTS, up(08) drop(04) continue
+	STA ThrowDirection				;zero ThrowDirection
+			
+;set kicked X vel
+	LDA <Player_XVel				;Use CLC/SEC and BPL to do an arithmetic right shift
+	CMP #$80                            ;A >= $80 -> carry set (number was negative)
+                                        ;A < $80 -> carry clear (number was positive)
+    ROR A
+									;after this A= marios speed / 2
+	STA <Objects_XVel,X				;store A into shells x vel
+		
+;set kicked Y vel		
+	TYA								;transfer Y(ThrowDirection) to A, A is now $04 or $08													
+	LSR A							;;;;
+	LSR A							;logical shift rights, $04/4=1, $08/4=2
+	TAY								;transfer A to Y, either 1 or 2
+	LDA ThrownYVels,Y				;A= ThrownYVels,1 (00), or ThrownYVels,2 (-60)
+	STA <Objects_YVel,X				;set that to shells y vel
+	LDA #OBJSTATE_SHELLED			;set state to shelled
+	STA Objects_State,X
+	LDA #$ff						;reset wake up timer on shells
+	STA Objects_Timer3,X
+KickedShellReturn:			
+	RTS
+DropTrickVel:
+	LDA #$28						;drop trick velocity
+	STA <Objects_YVel,X
+	RTS
+
+SetThrowDirection:
+	LDA #$00						;clear objects drop flag on rethrow
+	STA Objects_UpDrop,X			;in case shell was dropped and then recaught before hitting the ground clear		
+	
+	LDA <Pad_Holding				;check if holding up
+	AND #PAD_UP		
+	BNE ThrowReturn					;if not holding up check down
+	
+	LDA <Pad_Holding				;check if holding down
+	AND #PAD_DOWN
+ThrowReturn:
+	STA ThrowDirection				;store up=$08, down=$04, or neither=$00 to ThrowDirection
+	STA Objects_UpDrop,X			;store it in the per object slot array, used for other zero/nonzero checks
+	RTS
+	
+HitCeilingBumpBlocks_30:
+	LDA Objects_UpDrop,X			;check if that object slot was up/down kicked
+	BEQ SkipBumpBlocks				;skip bump blocks, but still apply downward y vel for koopas bumped from underneath if hit ceiling
+									;remove this up/drop kick check if you want bumped from underneath
+									;shells to interact with bump blocks above
+
+	LDY #10							;we are only throwing shells up 
+									;so group 1 head row in Object_TileDetectOffsets ($00, $08)
+	JSR Object_DetectTile			;detect the ceiling tile in prg0
+	JSR Object_BumpBlocks			;bump blocks if necessary in prg0
+SkipBumpBlocks:
+	LDA #$10						;velocity shell falls back down, what was removed in prg0
+	STA <Objects_YVel,X
+	RTS
+	
+AirborneShellKill_30:
+	LDA Objects_UpDrop,X			;check if that object slot was up/down kicked
+	BEQ AirborneShellNoKill			;RTS
+	JMP DoUpDownKill_00				;jump to the code that kills enemies from a kicked shell
+AirborneShellNoKill:
+	RTS
+	
+WallPopOut:
+;remove wall kill logic and pop objects out of walls instead
+;%00000001  (= $01)  hit right wall
+;%00000010  (= $02)  hit left wall
+;shift bits one to the right, carry set=right wall, carry clear=left wall
+;after  lsr:  %00000000    carry = 1    (hit right wall)
+;after  lsr:  %00000001    carry = 0    (hit left wall)
+    LSR A						;do logical shift, carry=which side of the wall
+	LDA #10						;using 10 for regular shells
+	LDY Objects_IsGiant,X		;check if it's a giant shell
+	BEQ WallPopAmount
+	LDA #16						;if it is giant, use 16 instead
+WallPopAmount:
+	STA <Temp_Var1				;store 10 or 20 in temp var 1
+	
+	LDA <Objects_X,X			;load current x position
+    BCC ObjectPopRight			;if the lsr set carry clear it's a left wall, pop right
+	
+	SUB <Temp_Var1				;otherwise right side wall, subtract 10/16 pixels, pop left
+	STA <Objects_X,X
+	LDA <Objects_XHi,X
+	SBC #$00
+	STA <Objects_XHi,X
+	RTS							;pop it!
+ObjectPopRight:
+	ADD <Temp_Var1				;left side wall, add 10/16 pixels, pop right
+	STA <Objects_X,X
+	LDA <Objects_XHi,X
+	ADC #$00
+	STA <Objects_XHi,X
+	RTS							;pop it!
+	
+	.ds 0xBE
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -6110,21 +6228,16 @@ Buster_ThrowCheck_30:
 
 RemoveThrowFlag:						;clear throw flag and set x vel to 0 for objects that don't set their own vel every frame
 	LDA #$00
+Buster_ThrowCheckSet:
 	STA Buster_ThrowFlag,X
 	STA <Objects_XVel,X
+Buster_ThrowCheckReturn:
 	RTS
 	
 FlipThrowXVel:							;flips/halves x velocity on wall hit
-	CLC
 	LDA Buster_ThrowFlag,X
-	BPL WallBounceDivide
-	SEC
-WallBounceDivide:
-	ROR A
-
 	JSR Negate
-	STA Buster_ThrowFlag,X				;negate Buster_ThrowFlag to use as x vel now
-	STA <Objects_XVel,X
-
-Buster_ThrowCheckReturn:
-	RTS
+	CMP #$80                            ;A >= $80 -> carry set (number was negative)
+                                        ;A < $80 -> carry clear (number was positive)
+    ROR A
+	BNE Buster_ThrowCheckSet
