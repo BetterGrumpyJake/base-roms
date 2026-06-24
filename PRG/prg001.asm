@@ -1024,6 +1024,7 @@ Bounce_TileReplacements:
 	.byte CHNGTILE_TOBOUNCEWOOD
 	.byte CHNGTILE_TOBRICKCOIN
 	.byte CHNGTILE_PIPEJCT
+	.byte CHNGTILE_DELETETOBG
 
 	; Power-up X or Y velocity upon emerging from the bounce block
 Bouncer_PUpVel:	.byte $00, -$40, -$40, -$30, -$20, -$10, $00, $10, $20, $30, $40
@@ -2591,6 +2592,11 @@ ObjInit_Vine:
 	; Stores the high byte of the VRAM address
 Vine_NTHigh:	.byte $20, $28
 
+EatableTable:		;what can a vine "eat"
+	.byte TILEA_MUNCHER
+	.byte TILE4_JELECTRO
+EatableTable_Size = * - EatableTable
+
 ObjNorm_Vine:
 
 	; Vine moves at Y Vel = -$10
@@ -2618,6 +2624,15 @@ ObjNorm_Vine:
 
 	CMP Tile_AttrTable,Y
 	BLT PRG001_AC86	 ; If vine is not within the solid tiles, jump to PRG001_AC86
+	
+	LDY #00
+VineEatLoop:
+	CMP EatableTable,Y
+	BEQ PRG001_AC86
+	
+	INY
+	CPY #EatableTable_Size
+	BNE VineEatLoop
 
 PRG001_AC80:
 
