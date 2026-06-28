@@ -2308,6 +2308,9 @@ ObjHit_CloudPlat:
 	BMI PRG002_AA85	 ; If Player is moving upward, jump to PRG002_AA85 (RTS)
 
 Player_StandOnPlatform:
+	LDA Player_CeilAbove
+	BNE OffPlatform			;ceiling above, do not set Y
+	
 	; Set Player to object's Y - 31
 	LDA <Objects_Y,X	 
 	SUB #31
@@ -2316,6 +2319,7 @@ Player_StandOnPlatform:
 	SBC #$00
 	STA <Player_YHi
 
+OffPlatform:
 	; Flag Player as NOT mid-air
 	LDY #$00
 	STY <Player_InAir

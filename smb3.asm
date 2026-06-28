@@ -2482,8 +2482,9 @@ Tile_Mem:	.ds 6480	; $6000-$794F Space used to store the 16x16 "tiles" that make
 	ThrowDirection: 	.ds 1		;$7997 flag for up, down, or neither for shells
 	Objects_UpDrop: 	.ds 8		;$7998-$799F, flag for drop tricks per object slot
 	Buster_ThrowFlag:	.ds 8 		;$79A0-$79A8 used to track objects thrown by buster and set velocities accordingly
+	Player_CeilAbove:	.ds 1	; $F9 set if a solid tile is directly above head
 	
-						.ds 88	; $79A9-$79FF unused
+						.ds 87	; $79A8-$79FF unused
 	; Auto scroll effect variables -- everything to do with screens that aren't scrolling in the normal way
 	; NOTE: Post-airship cinematic scene with Toad and King ONLY uses $7A01-$7A11 MMC3 SRAM (from Level_AScrlSelect to Level_AScrlHVelCarry)
 

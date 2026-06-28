@@ -932,6 +932,7 @@ PRG008_A472:
 	JSR Player_PowerUpdate	 	; Update "Power Meter"
 	JSR Player_DoScrolling	 	; Scroll relative to Player against active rules
 	JSR AScrlURDiag_HandleWrap 	; Handle the diagonal autoscroller wrapping
+	JSR Player_CheckCeilAbove	; Flag if a solid tile is directly above head
 	JSR Player_DetectSolids		; Handle solid tiles, including slopes if applicable
 	JSR Player_TailAttack_HitBlocks	; Do Tail attack against blocks
 	JSR Player_DoSpecialTiles	; Handle unique-to-style tiles!

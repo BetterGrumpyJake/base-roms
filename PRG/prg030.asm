@@ -3427,8 +3427,37 @@ FlipThrowXVel:							;flips/halves x velocity on wall hit
                                         ;A < $80 -> carry clear (number was positive)
     ROR A
 	BNE Buster_ThrowCheckSet
+	
+Player_CheckCeilAbove:
+	LDX #$10						;small/ducking offset
+	LDA <Player_Suit
+	BEQ CeilingCheck
+	LDA Player_IsDucking
+	BNE CeilingCheck
+	LDX #$06						;big offset
+CeilingCheck:
+	STX <Temp_Var10					;Y offset (head)
+	LDA #$08
+	STA <Temp_Var11					;X offset (head center)
 
-	.ds 0x76
+	LDX #$01
+	LDY #$ff
+	JSR Player_GetTileAndSlope		;A = tile above head
+
+	TAY
+	AND #%11000000
+	ASL A
+	ROL A
+	ROL A
+	TAX
+	TYA
+	CMP Tile_AttrTable+4,X
+	LDA #$00
+	ROL A							;A = carry (1 = solid above)
+	STA Player_CeilAbove
+	RTS
+
+	.ds 0x4A
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
