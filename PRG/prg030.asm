@@ -3404,6 +3404,13 @@ Buster_ThrowCheck_30:
 	
 	STA <Objects_XVel,X					;restamp object with the x vel
 	
+	LDA <Objects_DetStat,X				;ceiling check
+	AND #$08
+	BEQ Buster_WallCheck
+	LDA #$10							;hit ceiling add downward velocity
+	STA <Objects_YVel,X
+
+Buster_WallCheck:	
 	LDA <Objects_DetStat,X				;wall check
 	AND #$03
 	BNE FlipThrowXVel
@@ -3457,7 +3464,7 @@ CeilingCheck:
 	STA Player_CeilAbove
 	RTS
 
-	.ds 0x4A
+	.ds 0x40
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
