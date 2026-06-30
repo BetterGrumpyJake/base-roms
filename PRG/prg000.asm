@@ -311,7 +311,7 @@ Object_AttrFlags:
 	.byte OAT_BOUNDBOX01 | OAT_FIREIMMUNITY | OAT_HITNOTKILL	; Object $0D - OBJ_POWERUP_MUSHROOM
 	.byte OAT_BOUNDBOX09 | OAT_HITNOTKILL	; Object $0E - OBJ_BOSS_KOOPALING
 	.byte OAT_BOUNDBOX00	; Object $0F
-	.byte OAT_BOUNDBOX00	; Object $10
+	.byte OAT_BOUNDBOX01 | OAT_WEAPONIMMUNITY | OAT_FIREIMMUNITY | OAT_HITNOTKILL | OAT_BOUNCEOFFOTHERS ; Object $10
 	.byte OAT_BOUNDBOX00	; Object $11
 	.byte OAT_BOUNDBOX00	; Object $12
 	.byte OAT_BOUNDBOX00	; Object $13
@@ -1665,7 +1665,7 @@ PRG000_C85C:
 
 ; FIXME: Anybody want to claim this?
 ; $C893
-	.byte $FC, $04, $01, $02
+;	.byte $FC, $04, $01, $02
 
 
 	; When Object hits water, splash!
@@ -2245,6 +2245,8 @@ PRG000_CB86:
 PRG000_CB8E:
 	JSR Object_ShakeAndDrawMirrored	 ; Draw mirrored sprite
 
+	CPY #OBJ_HOLDNOTE		;skip holdnote
+	BEQ PRG000_CBB3
 	LDY Level_ObjectID,X
 	CPY #OBJ_ICEBLOCK
 	BEQ PRG000_CBB3	 ; If object is an Iceblock, jump to PRG000_CBB3 (RTS)
@@ -2770,6 +2772,7 @@ PRG000_CE2F:
 	
 _check_throw_dir:
 	JSR SetThrowDirection
+
 	;wall check/pop out
 	LDY #1	 ; Y = 1
 
@@ -2813,6 +2816,9 @@ SkipKickSound:
 
 	LDA Level_ObjectID,X
 
+	CMP #OBJ_HOLDNOTE			;holdable notes act just like bobombs
+	BEQ PRG000_CE54
+	
 	CMP #OBJ_BOBOMBEXPLODE
 	BEQ PRG000_CE54	 ; If this is a Bob-omb ready to explode, jump to PRG000_CE54
 
@@ -2857,17 +2863,17 @@ PRG000_CE76:
 	JMP Object_ShakeAndDraw	 ; Draw Bob-omb and don't come back!
 
 PRG000_CE79:
-
 	; Anything besides a Bob-omb...
-
 	; Clear Objects_KillTally 
 	LDA #$00	
 	STA Objects_KillTally,X
 
+	LDA Objects_State,X
+	CMP #OBJSTATE_HELD
+	BNE PRG000_CEBE				;bumped shell, was not held/thrown
+
 PRG000_CEB4:
-
-	; Object kicked not against wall...
-
+	; Object just held/thrown, not bumped. set Y to which way mario is facing
 	LDY #0	 	; Y = 0
 
 	LDA <Player_FlipBits
@@ -2876,12 +2882,10 @@ PRG000_CEB4:
 	INY		; Y = 1
 
 PRG000_CEBB:
-	JMP PRG000_CEC6	; Jump to PRG000_CEC6
+	JMP PRG000_CEC6	; Jump to PRG000_CEC6, skip bumped shell logic
 
 PRG000_CEBE:
-
 	; Object kicked, was not held
-
 	; Make sure Player is facing object he's kicking
 	JSR Level_ObjCalcXDiffs
 	LDA PlayerKickFlipBits,Y
@@ -3026,6 +3030,9 @@ PRG000_CF49:
 
 	JSR Object_WorldDetectN1	; Detect against world
 	JSR Object_CalcSpriteXY_NoHi	; Calculate low parts of sprite X/Y (never off-screen when held by Player!)
+	LDA Level_ObjectID,X			;skip killing a held noteblock on enemies
+	CMP #OBJ_HOLDNOTE
+	BEQ PRG000_CF98
 	JSR ObjectToObject_HitTest	; Test if this object has collided with another object
 	BCC PRG000_CF98		 ; If this object did not collide with any other objects, jump to PRG000_CF98
 
@@ -3371,7 +3378,10 @@ ObjectHeld_WakeUpDir:	.byte $40, $00
 Object_ShellDoWakeUp:
 
 	; If object is a Bob-omb, jump to PRG000_D0EC, otherwise jump to PRG000_D101
-	LDA Level_ObjectID,X	  
+	LDA Level_ObjectID,X
+	LDA Level_ObjectID,X
+	CMP #OBJ_HOLDNOTE		;skip holdnote
+    BEQ PRG000_D100
 	CMP #OBJ_BOBOMBEXPLODE 
 	BEQ PRG000_D0EC 
 	CMP #OBJ_BOBOMB 
