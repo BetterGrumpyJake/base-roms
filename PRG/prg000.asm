@@ -6470,16 +6470,16 @@ Object_AnySprOffscreen:
 ; FIXME: Anybody want to claim this?
 ; Appears it would return a free object slot
 ; $DD5B 
-	LDY #$04	; Y = 4
-PRG000_DD5D:
-	LDA Objects_State,Y
-	BEQ PRG000_DD65	 ; If this object slot is dead/empty, jump to PRG000_DD65
-
-	DEY		 ; Y--
-	BPL PRG000_DD5D	 ; While Y >= 0, loop
-
-PRG000_DD65:
-	RTS		 ; Return
+;	LDY #$04	; Y = 4
+;PRG000_DD5D:
+;	LDA Objects_State,Y
+;	BEQ PRG000_DD65	 ; If this object slot is dead/empty, jump to PRG000_DD65
+;
+;	DEY		 ; Y--
+;	BPL PRG000_DD5D	 ; While Y >= 0, loop
+;
+;PRG000_DD65:
+;	RTS		 ; Return
 
 
 ; FIXME: Anybody want to claim this?
@@ -7008,17 +7008,14 @@ WallCheck:
 	LDA <Objects_DetStat,X 
 	AND #$03 
 	BEQ ThrowObj_Ret	 ; If object has NOT hit wall, jump to ThrowObj_Ret 
-
-	JSR Object_AboutFace	 		; Turn around... 
 	
-	CLC								;do x velocity arithmetic
-	LDA <Objects_XVel,X				;Use CLC/SEC and BPL to do an arithmetic right shift
-	BPL WallBounceDivide			;BPL branch on N=0
-	SEC		
-WallBounceDivide:
-	ROR A							;mod N,Z,C
-									;after this A= object x vel / 2
+;code from bobomb logic
+	LDA <Objects_XVel,X
+	JSR Negate
 	STA <Objects_XVel,X
+	; ... and sort of arithmetically divide by 2
+	ASL A
+	ROR <Objects_XVel,X
 
 ThrowObj_Ret:
 	RTS
