@@ -3407,36 +3407,11 @@ Buster_ThrowCheck_30:
 	
 	STA <Objects_XVel,X					;restamp object with the x vel
 	
-	LDA <Objects_DetStat,X				;ceiling check
-	AND #$08
-	BEQ Buster_WallCheck
-	LDA #$10							;hit ceiling add downward velocity
-	STA <Objects_YVel,X
-
-Buster_WallCheck:	
-	LDA <Objects_DetStat,X				;wall check
-	AND #$03
-	BNE FlipThrowXVel
-	
-	LDA <Objects_DetStat,X				;floor check
-	AND #$04
-	BEQ Buster_ThrowCheckReturn
-
-RemoveThrowFlag:						;clear throw flag and set x vel to 0 for objects that don't set their own vel every frame
-	LDA #$00
-Buster_ThrowCheckSet:
+	JSR ThrowObj_DetectWorld
+	LDA <Objects_XVel,X
 	STA Buster_ThrowFlag,X
-	STA <Objects_XVel,X
 Buster_ThrowCheckReturn:
 	RTS
-	
-FlipThrowXVel:							;flips/halves x velocity on wall hit
-	LDA Buster_ThrowFlag,X
-	JSR Negate
-	CMP #$80                            ;A >= $80 -> carry set (number was negative)
-                                        ;A < $80 -> carry clear (number was positive)
-    ROR A
-	BNE Buster_ThrowCheckSet
 	
 Player_CheckCeilAbove:
 	LDX #$10						;small/ducking offset
@@ -3467,7 +3442,7 @@ CeilingCheck:
 	STA Player_CeilAbove
 	RTS
 
-	.ds 0x40
+	.ds 0x60
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

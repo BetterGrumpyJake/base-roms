@@ -266,7 +266,7 @@ ObjectGroup00_Attributes3:
 	.byte OA3_HALT_NORMALONLY | OA3_TAILATKIMMUNE	; Object $0D - OBJ_POWERUP_MUSHROOM
 	.byte OA3_HALT_NORMALONLY | OA3_TAILATKIMMUNE	; Object $0E - OBJ_BOSS_KOOPALING
 	.byte OA3_HALT_HOTFOOTSPECIAL 	; Object $0F
-	.byte OA3_HALT_NORMALONLY	; Object $10
+	.byte OA3_HALT_NORMALONLY | OA3_TAILATKIMMUNE	; Object $10
 	.byte OA3_HALT_HOTFOOTSPECIAL 	; Object $11
 	.byte OA3_HALT_HOTFOOTSPECIAL 	; Object $12
 	.byte OA3_HALT_HOTFOOTSPECIAL 	; Object $13
@@ -409,7 +409,7 @@ ObjP03:
 ObjP07:
 ObjP0E:
 ObjP0F:
-ObjP10:	.byte $81, $83, $81, $81, $81, $81
+ObjP10:	.byte $81, $81, $81, $81, $81, $81
 ObjP11:
 ObjP12:
 ObjP13:
@@ -451,10 +451,7 @@ ObjInit_HoldNote:
 ObjNorm_HoldNote:
 	JSR Object_DeleteOffScreen
 	
-	LDA #$00					;set frame to 0
-	STA Objects_Frame,X
-	
-	JSR Object_ShakeAndDraw
+	JSR Object_ShakeAndDrawMirrored
 
 	LDA <Player_HaltGame
 	BNE HoldNote_Ret2

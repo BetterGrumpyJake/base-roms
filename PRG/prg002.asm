@@ -952,6 +952,7 @@ BusterObjectTable:						;what objects can buster pickup
 	.byte OBJ_NIPPER					;$33 Stationary nipper plant
 	.byte OBJ_NIPPERHOPPING				;$39 Hopping nipper plant
 	.byte OBJ_NIPPERFIREBREATHER		;$3D Fire belching nipper plant
+	.byte OBJ_HOLDNOTE
 
 ;size of table, regardless if added to/subtracted from
 BusterObjectTableSize = * - BusterObjectTable
@@ -1002,6 +1003,7 @@ Buster_CheckHeldState:
 	
 	LDA #$00							;otherwise clear the flags because it's dead/kicked probably
 	STA <Objects_Var5,X					;clear holding flag
+	STA Buster_ThrowFlag,Y				;clear the throwflag, mainly for throwable items that aren't shells
 	RTS
 	
 ObjNorm_BusterBeatle:
@@ -1225,6 +1227,7 @@ Buster_Throw:
 
 	LDA <Objects_Var5,X					;if object, no need to check for empty slot
 	BMI Buster_ThrowObject				;bit 7 set(object), go to Buster_ThrowObject
+	BEQ Buster_RTS						;guard against reaching here without holding anymore, if var5=0 get out
 	
 	LDX #$04	 						;X = 4 for the find dead/empty loop, check slots 4, 3, 2, 1, 0
 

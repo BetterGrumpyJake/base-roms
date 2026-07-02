@@ -311,7 +311,7 @@ Object_AttrFlags:
 	.byte OAT_BOUNDBOX01 | OAT_FIREIMMUNITY | OAT_HITNOTKILL	; Object $0D - OBJ_POWERUP_MUSHROOM
 	.byte OAT_BOUNDBOX09 | OAT_HITNOTKILL	; Object $0E - OBJ_BOSS_KOOPALING
 	.byte OAT_BOUNDBOX00	; Object $0F
-	.byte OAT_BOUNDBOX01 | OAT_WEAPONIMMUNITY | OAT_FIREIMMUNITY | OAT_HITNOTKILL | OAT_BOUNCEOFFOTHERS ; Object $10
+	.byte OAT_BOUNDBOX01 | OAT_WEAPONIMMUNITY | OAT_BOUNCEOFFOTHERS ; Object $10
 	.byte OAT_BOUNDBOX00	; Object $11
 	.byte OAT_BOUNDBOX00	; Object $12
 	.byte OAT_BOUNDBOX00	; Object $13
@@ -6964,6 +6964,7 @@ ThrowObj_DetectWorld:
 	
 	LDA #$00						;if shell touches ground, clear the flag
 	STA Objects_UpDrop,X
+	STA Buster_ThrowFlag,X
 
 	LDA <Objects_YVel,X
 	BMI ThrowObj_CeilingCheck	 			;If object is moving upward, jump to ThrowObj_CeilingCheck 
