@@ -6962,9 +6962,9 @@ ThrowObj_DetectWorld:
 	AND #$04 
 	BEQ ThrowObj_CeilingCheck	 			;did not hit floor move on to ThrowObj_CeilingCheck
 	
-	LDA #$00						;if shell touches ground, clear the flag
+	LDA #$00								;if shell touches ground, clear the flag
 	STA Objects_UpDrop,X
-	STA Buster_ThrowFlag,X
+	STA Buster_ThrowFlag,X					;if object touches ground, clear buster throwflag
 
 	LDA <Objects_YVel,X
 	BMI ThrowObj_CeilingCheck	 			;If object is moving upward, jump to ThrowObj_CeilingCheck 
