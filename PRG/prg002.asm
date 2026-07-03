@@ -1190,7 +1190,7 @@ PRG002_A587:
 
 	JSR Object_CalcCoarseYDiff
 	LDA <Temp_Var15
-	CMP #$08							;change busters proximity so he doesn't throw when you boop a koopa into shelled
+	CMP #$0A							;change busters proximity so he doesn't throw when you boop a koopa into shelled
 										;$01 - 4px above - 0.25 tiles
 										;$02 - 8px above - 0.50 tiles
 										;$03 - 12px above - 0.75 tiles

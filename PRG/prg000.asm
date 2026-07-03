@@ -280,7 +280,7 @@ Object_BoundBox:
 	.byte  1,  13,   2,   8	; 1
 	.byte  2,  12,   2,  24	; 2
 	.byte 10,  27,  -2,  18	; 3
-	.byte  1,  14,   2,  26	; 4 (UNUSED)
+	.byte  1,  14,   -4,  12	; 4 (UNUSED)
 	.byte  5,  14,  10,  18	; 5 (UNUSED)
 	.byte  2,  27,  -2,  34	; 6
 	.byte  2,  20,   2,  12	; 7
@@ -311,7 +311,7 @@ Object_AttrFlags:
 	.byte OAT_BOUNDBOX01 | OAT_FIREIMMUNITY | OAT_HITNOTKILL	; Object $0D - OBJ_POWERUP_MUSHROOM
 	.byte OAT_BOUNDBOX09 | OAT_HITNOTKILL	; Object $0E - OBJ_BOSS_KOOPALING
 	.byte OAT_BOUNDBOX00	; Object $0F
-	.byte OAT_BOUNDBOX01 | OAT_WEAPONIMMUNITY | OAT_BOUNCEOFFOTHERS ; Object $10
+	.byte OAT_BOUNDBOX04 | OAT_WEAPONIMMUNITY | OAT_BOUNCEOFFOTHERS ; Object $10
 	.byte OAT_BOUNDBOX00	; Object $11
 	.byte OAT_BOUNDBOX00	; Object $12
 	.byte OAT_BOUNDBOX00	; Object $13

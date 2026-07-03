@@ -494,7 +494,7 @@ HoldNote_NoHigh:
 	ORA #SND_PLAYERJUMP
 	STA Sound_QPlayer
 	
-	LDA #-$70					;otherwise do high bounce
+	LDA #-$60					;otherwise do high bounce
 HoldNote_SetCap:
 	STA <Player_YVel
 	LDA #HOLDNOTE_FLOATFRAMES	;starts a 12 frame timer where holding A can extend height, variable bounce height
