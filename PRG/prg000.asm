@@ -438,7 +438,8 @@ Object_AttrFlags:
 	.byte OAT_BOUNDBOX13 | OAT_FIREIMMUNITY	; Object $8C - OBJ_THWOMPRIGHTSLIDE
 	.byte OAT_BOUNDBOX13 | OAT_FIREIMMUNITY	; Object $8D - OBJ_THWOMPUPDOWN
 	.byte OAT_BOUNDBOX13 | OAT_FIREIMMUNITY	; Object $8E - OBJ_THWOMPDIAGONALUL
-	.byte OAT_BOUNDBOX13 | OAT_FIREIMMUNITY	; Object $8F - OBJ_THWOMPDIAGONALDL
+	;.byte OAT_BOUNDBOX13 | OAT_FIREIMMUNITY	; Object $8F - OBJ_THWOMPDIAGONALDL
+	.byte OAT_BOUNDBOX01 | OAT_BOUNCEOFFOTHERS ; Object $8F - OBJ_SHELLEDTROOPA
 	.byte OAT_BOUNDBOX01 | OAT_WEAPONIMMUNITY | OAT_HITNOTKILL	; Object $90 - OBJ_TILTINGPLATFORM
 	.byte OAT_BOUNDBOX01 | OAT_WEAPONIMMUNITY | OAT_HITNOTKILL	; Object $91 - OBJ_TWIRLINGPLATCWNS
 	.byte OAT_BOUNDBOX01 | OAT_WEAPONIMMUNITY | OAT_HITNOTKILL	; Object $92 - OBJ_TWIRLINGPLATCW
@@ -2245,8 +2246,6 @@ PRG000_CB86:
 PRG000_CB8E:
 	JSR Object_ShakeAndDrawMirrored	 ; Draw mirrored sprite
 
-	CPY #OBJ_HOLDNOTE		;skip holdnote
-	BEQ PRG000_CBB3
 	LDY Level_ObjectID,X
 	CPY #OBJ_ICEBLOCK
 	BEQ PRG000_CBB3	 ; If object is an Iceblock, jump to PRG000_CBB3 (RTS)
@@ -2595,8 +2594,8 @@ PRG000_CD46:
 
 	; NOTE: I really, really wish Nintendo used a consistent check here!
 	; Other code checks Objects_IsGiant before taking this route...
-	CMP #OBJ_BIGGREENTROOPA
-	BGE PRG000_CD80	 ; If the object ID >= OBJ_BIGGREENTROOPA (why not use Objects_IsGiant?!), jump to PRG000_CD80
+	LDA Objects_IsGiant,X
+	BNE PRG000_CD80
 
 	LDA Level_NoStopCnt
 	LSR A	
@@ -3379,9 +3378,6 @@ Object_ShellDoWakeUp:
 
 	; If object is a Bob-omb, jump to PRG000_D0EC, otherwise jump to PRG000_D101
 	LDA Level_ObjectID,X
-	LDA Level_ObjectID,X
-	CMP #OBJ_HOLDNOTE		;skip holdnote
-    BEQ PRG000_D100
 	CMP #OBJ_BOBOMBEXPLODE 
 	BEQ PRG000_D0EC 
 	CMP #OBJ_BOBOMB 
@@ -3454,6 +3450,7 @@ PRG000_D11C:
 PRG000_D120:
 
 	; Object is not a Bob-omb and not an Ice Block... 
+	JSR GetWakeupTimer
 
 	LDA Objects_Timer3,X 
 	BNE PRG000_D15A	 ; If timer 3 is not expired, jump to PRG000_D15A (RTS) 

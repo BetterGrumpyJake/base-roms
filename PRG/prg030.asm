@@ -3395,6 +3395,16 @@ _not_shelled:			; For non-shells, do normal stomp comparison
     CMP <Player_Y
     RTS
 
+GetWakeupTimer:
+	CMP #$8F	;stationary shell
+	BEQ ForeverTimer
+	CMP #$10	;spring
+	BNE _get_wakeup_timer_std
+ForeverTimer:
+	STA Objects_Timer3,X			; Just put the ID into the wakeup timer, and it will never wake up
+_get_wakeup_timer_std:
+	RTS
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;Buster throwing stuff;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -3413,7 +3423,8 @@ Buster_ThrowCheck_30:
 	STA Buster_ThrowFlag,X
 Buster_ThrowCheckReturn:
 	RTS
-	
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;ceiling check for platforms;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 Player_CheckCeilAbove:
 	LDX #$10						;small/ducking offset
 	LDA <Player_Suit
@@ -3443,7 +3454,7 @@ CeilingCheck:
 	STA Player_CeilAbove
 	RTS
 
-	.ds 0x60
+	.ds 0x51
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
